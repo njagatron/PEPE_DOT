@@ -21,10 +21,15 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [background, setBackground] = useState(null);
 
-  const [points, setPoints] = useState([]); // [{x,y,image,name,comment,originalName,dateISO,pdfIdx,page}]
+  // points: [{x,y,image,name,comment,originalName,dateISO,pdfIdx,page,source,sessionId}]
+  const [points, setPoints] = useState([]);
 
   const [stageSize, setStageSize] = useState({ width: 960, height: 600 });
   const [bgFit, setBgFit] = useState({ w: 960, h: 600, x: 0, y: 0, scaleX: 1, scaleY: 1 });
+
+  const [previewPhoto, setPreviewPhoto] = useState(null);
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const sessionId = React.useMemo(() => Date.now(), []);
 
   const stageRef = useRef(null);
   const exportRef = useRef(null);
@@ -133,6 +138,7 @@ export default function App() {
       setPdfDoc(null);
       setBackground(null);
     }
+    setShowAllSessions(false); // nakon load-a RN, po defaultu prikaz samo nove sesije
   };
 
   const createRn = () => {
@@ -155,6 +161,7 @@ export default function App() {
     setPoints(init.points);
     setPdfDoc(null);
     setBackground(null);
+    setShowAllSessions(false);
   };
 
   const renameRn = () => {
@@ -179,7 +186,6 @@ export default function App() {
   };
 
   const deleteRn = (rn) => {
-    if (!window.confirm(`Obrisati ${rn}?`)) return;
     localStorage.removeItem(STORAGE_PREFIX + rn);
     const updated = rnList.filter((x) => x !== rn);
     setRnList(updated);
@@ -194,6 +200,16 @@ export default function App() {
       setPdfDoc(null);
       setBackground(null);
     }
+  };
+
+  const deleteRnWithConfirm = (rnName) => {
+    const confirmation = window.prompt(`Za brisanje RN-a upišite njegov naziv: "${rnName}"`);
+    if (confirmation !== rnName) {
+      window.alert("Naziv RN-a nije ispravan, brisanje otkazano.");
+      return;
+    }
+    if (!window.confirm(`Jeste li sigurni da želite obrisati RN "${rnName}"?`)) return;
+    deleteRn(rnName);
   };
 
   const renderPdfPage = async (pdf, pageNum) => {
@@ -238,8 +254,9 @@ export default function App() {
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || file.type !== "application/pdf") return;
+    if (!file) return; // ne provjeravamo strogo MIME; radi i na iOS
     await addPdf(file);
+    e.target.value = "";
   };
 
   const selectPdf = async (idx) => {
@@ -259,7 +276,6 @@ export default function App() {
   };
 
   const deletePdf = (idx) => {
-    if (!window.confirm("Obrisati ovaj PDF i sve točke s njega?")) return;
     const delId = idx;
     const filteredPoints = points
       .filter((pt) => pt.pdfIdx !== delId)
@@ -276,6 +292,18 @@ export default function App() {
       const nextIdx = Math.max(0, delId - 1);
       selectPdf(nextIdx);
     }
+  };
+
+  const deletePdfWithConfirm = (idx) => {
+    const p = pdfs[idx];
+    if (!p) return;
+    const confirmation = window.prompt(`Za brisanje PDF-a upišite njegov naziv: "${p.name}"`);
+    if (confirmation !== p.name) {
+      window.alert("Naziv PDF-a nije ispravan, brisanje otkazano.");
+      return;
+    }
+    if (!window.confirm(`Jeste li sigurni da želite obrisati PDF "${p.name}"? (obrisat će se i točke s njega)`)) return;
+    deletePdf(idx);
   };
 
   const changePage = async (dir) => {
@@ -324,6 +352,7 @@ export default function App() {
     const comment = window.prompt("Unesi komentar (opcionalno):") || "";
     const full = `${base}${getTodayDateSuffix()}`;
     const dateISO = new Date().toISOString().slice(0, 10);
+    const source = preferCamera ? "captured" : "uploaded";
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -338,6 +367,8 @@ export default function App() {
         dateISO,
         pdfIdx: activePdfIdx,
         page: currentPage,
+        source,
+        sessionId,
       };
       setPoints((prev) => [...prev, pt]);
     };
@@ -374,13 +405,15 @@ export default function App() {
   };
 
   const exportExcel = () => {
-    const data = points
+    const list = points
       .filter((p) => pdfs[p.pdfIdx])
-      .map((p) => ({
-        NazivTocke: p.name,
-        NazivFotografije: p.originalName || "",
-        Datum: p.dateISO || "",
-      }));
+      .filter((p) => (showAllSessions ? true : p.sessionId === sessionId));
+    const data = list.map((p, i) => ({
+      ID: i + 1,
+      NazivTocke: p.name,
+      NazivFotografije: p.originalName || "",
+      Datum: p.dateISO || "",
+    }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Tocke");
@@ -409,10 +442,10 @@ export default function App() {
             </div>
             <div>
               <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 1 }}>PEPEDOT</div>
-              <div style={{ fontSize: 12, color: "#b7c3c8" }}>Protupožarno brtvljenje · foto → točka na nacrtu</div>
+              <div style={{ fontSize: 12, color: "#b7c3c8" }}>PP BRTVLJENJE - FOTOTOČKA NANACRTU</div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button style={{ ...btn.base, ...btn.primary }} onClick={createRn}>+ Novi RN</button>
             <button style={{ ...btn.base }} onClick={renameRn} disabled={!activeRn}>Preimenuj RN</button>
           </div>
@@ -433,7 +466,7 @@ export default function App() {
                 >
                   {rn}
                 </button>
-                <button style={{ ...btn.base, ...btn.danger }} onClick={() => deleteRn(rn)}>Obriši</button>
+                <button style={{ ...btn.base, ...btn.danger }} onClick={() => deleteRnWithConfirm(rn)}>Obriši</button>
               </div>
             ))}
           </div>
@@ -453,10 +486,13 @@ export default function App() {
                   Aktivni PDF: <strong style={{ color: deco.gold }}>{pdfs[activePdfIdx]?.name}</strong>
                 </span>
                 <button style={{ ...btn.base }} onClick={() => renamePdf(activePdfIdx)} disabled={!pdfs.length}>Preimenuj PDF</button>
-                <button style={{ ...btn.base, ...btn.danger }} onClick={() => deletePdf(activePdfIdx)} disabled={!pdfs.length}>Obriši PDF</button>
+                <button style={{ ...btn.base, ...btn.danger }} onClick={() => deletePdfWithConfirm(activePdfIdx)} disabled={!pdfs.length}>Obriši PDF</button>
               </>
             )}
             <div style={{ flex: 1 }} />
+            <button style={{ ...btn.base }} onClick={() => setShowAllSessions((s) => !s)}>
+              {showAllSessions ? "Prikaži samo novu sesiju" : "Prikaži sve sesije"}
+            </button>
             <button style={{ ...btn.base }} onClick={exportExcel}>Izvoz Excel</button>
             <button style={{ ...btn.base, ...btn.gold }} onClick={exportPDF}>Izvoz PDF</button>
           </div>
@@ -527,6 +563,7 @@ export default function App() {
                   )}
                   {points
                     .filter((p) => p.pdfIdx === activePdfIdx && p.page === currentPage)
+                    .filter((p) => (showAllSessions ? true : p.sessionId === sessionId))
                     .map((p, i) => {
                       const px = bgFit.x + p.x * bgFit.scaleX;
                       const py = bgFit.y + p.y * bgFit.scaleY;
@@ -545,39 +582,26 @@ export default function App() {
 
         <section style={{ ...panel, marginTop: 12 }}>
           <div style={{ fontWeight: 700, letterSpacing: 0.6, marginBottom: 8 }}>
-            Fotografije (aktivni PDF / stranica)
+            Fotografije (lista — klik na ikonu za pregled)
           </div>
-          <div
-            style={{
-              display: "grid",
-              gap: 12,
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            }}
-          >
+          <div style={{ display: "grid", gap: 8 }}>
             {points
               .filter((p) => p.pdfIdx === activePdfIdx && p.page === currentPage)
+              .filter((p) => (showAllSessions ? true : p.sessionId === sessionId))
               .map((p, i) => {
                 const idx = points.findIndex((q) => q === p);
+                const downloadName = `${p.source || "photo"}_${p.originalName || "photo.jpg"}`;
                 return (
-                  <div key={i} style={{ ...panel, background: "#0f2328" }}>
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      style={{ width: "100%", height: "auto", borderRadius: 10, border: `1px solid ${deco.edge}` }}
-                    />
-                    <div style={{ marginTop: 8, fontWeight: 700 }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: "#9fb2b8" }}>
-                      Str: {p.page} · {p.originalName}
+                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, border: `1px solid ${deco.edge}`, borderRadius: 10, padding: "8px 10px", background: "#0f2328" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <button style={{ ...btn.base }} onClick={() => setPreviewPhoto(p)} title="Pregled fotografije">🔍</button>
+                      <div style={{ fontWeight: 700 }}>{p.name}</div>
+                      <div style={{ fontSize: 12, color: "#9fb2b8" }}>
+                        {p.originalName} · {p.dateISO} · {p.source === "captured" ? "kamera" : "galerija"}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: "#9fb2b8" }}>Datum: {p.dateISO}</div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                      <a
-                        href={p.image}
-                        download={p.originalName || "photo.jpg"}
-                        style={{ ...btn.base, ...btn.ghost, textDecoration: "none" }}
-                      >
-                        Preuzmi
-                      </a>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <a href={p.image} download={downloadName} style={{ ...btn.base, ...btn.ghost, textDecoration: "none" }} title="Preuzmi fotografiju">⬇️</a>
                       <button style={{ ...btn.base, ...btn.warn }} onClick={() => editPoint(idx)}>Uredi</button>
                       <button style={{ ...btn.base, ...btn.danger }} onClick={() => deletePoint(idx)}>Obriši</button>
                     </div>
@@ -587,8 +611,32 @@ export default function App() {
           </div>
         </section>
 
+        {previewPhoto && (
+          <div
+            onClick={() => setPreviewPhoto(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.7)",
+              display: "grid",
+              placeItems: "center",
+              zIndex: 9999,
+              padding: 16,
+            }}
+            title="Zatvori"
+          >
+            <div style={{ maxWidth: "95vw", maxHeight: "90vh", background: "#0f2328", border: `1px solid ${deco.edge}`, borderRadius: 12, padding: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontWeight: 700 }}>{previewPhoto.name}</div>
+                <button style={{ ...btn.base, ...btn.danger }} onClick={() => setPreviewPhoto(null)}>Zatvori ✖</button>
+              </div>
+              <img src={previewPhoto.image} alt={previewPhoto.name} style={{ maxWidth: "90vw", maxHeight: "75vh", borderRadius: 8 }} />
+            </div>
+          </div>
+        )}
+
         <footer style={{ textAlign: "center", fontSize: 12, color: "#8ea3a9", padding: 16 }}>
-          © {new Date().getFullYear()} PEPEDOT · Protupožarno brtvljenje
+          © {new Date().getFullYear()} PEPEDOT · PP BRTVLJENJE - FOTOTOČKA NANACRTU
         </footer>
       </div>
     </div>
