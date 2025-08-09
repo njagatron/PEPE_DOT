@@ -9,20 +9,18 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export default function App() {
-  const STORAGE_PREFIX = "pepedot_rn_";
+  const STORAGE_PREFIX = "pepedot2_rn_";
 
   const [rnList, setRnList] = useState([]);
   const [activeRn, setActiveRn] = useState("");
 
-  const [pdfs, setPdfs] = useState([]); // [{id, name, data:Array<number>, numPages}]
+  const [pdfs, setPdfs] = useState([]); // [{id,name,data:Array<number>,numPages}]
   const [activePdfIdx, setActivePdfIdx] = useState(0);
   const [pdfDoc, setPdfDoc] = useState(null);
-
   const [currentPage, setCurrentPage] = useState(1);
-  const [background, setBackground] = useState(null);
 
-  // points: [{x,y,image,name,comment,originalName,dateISO,pdfIdx,page,source,sessionId}]
-  const [points, setPoints] = useState([]);
+  const [background, setBackground] = useState(null);
+  const [points, setPoints] = useState([]); // [{x,y,image,name,comment,originalName,dateISO,pdfIdx,page,source,sessionId}]
 
   const [stageSize, setStageSize] = useState({ width: 960, height: 600 });
   const [bgFit, setBgFit] = useState({ w: 960, h: 600, x: 0, y: 0, scaleX: 1, scaleY: 1 });
@@ -52,9 +50,7 @@ export default function App() {
     color: deco.ink,
     fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif",
   };
-
   const container = { maxWidth: 1180, margin: "0 auto", padding: 16 };
-
   const panel = {
     background: deco.card,
     border: `1px solid ${deco.edge}`,
@@ -62,7 +58,6 @@ export default function App() {
     padding: 12,
     boxShadow: "0 1px 0 rgba(255,255,255,0.03) inset, 0 6px 24px rgba(0,0,0,0.25)",
   };
-
   const btn = {
     base: {
       padding: "8px 12px",
@@ -79,13 +74,15 @@ export default function App() {
     ghost: { background: "transparent" },
   };
 
+  // init
   useEffect(() => {
-    const savedList = JSON.parse(localStorage.getItem("pepedot_rn_list") || "[]");
-    const savedActive = localStorage.getItem("pepedot_active_rn") || "";
+    const savedList = JSON.parse(localStorage.getItem("pepedot2_rn_list") || "[]");
+    const savedActive = localStorage.getItem("pepedot2_active_rn") || "";
     setRnList(savedList);
     if (savedActive && savedList.includes(savedActive)) loadRn(savedActive);
   }, []);
 
+  // responsive stage
   useEffect(() => {
     const onResize = () => {
       const w = Math.min(window.innerWidth - 24, 1180);
@@ -97,10 +94,12 @@ export default function App() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // recompute bg fit
   useEffect(() => {
     setBgFit(fitBackground(background, stageSize.width, stageSize.height));
   }, [background, stageSize]);
 
+  // persist active RN
   useEffect(() => {
     if (!activeRn) return;
     const payload = { pdfs, activePdfIdx, currentPage, points };
@@ -119,18 +118,13 @@ export default function App() {
     return { w: drawW, h: drawH, x, y, scaleX: drawW / iw, scaleY: drawH / ih };
   };
 
-  const emptyRnState = () => ({
-    pdfs: [],
-    activePdfIdx: 0,
-    currentPage: 1,
-    points: [],
-  });
+  const emptyRnState = () => ({ pdfs: [], activePdfIdx: 0, currentPage: 1, points: [] });
 
   const loadRn = (rn) => {
     const raw = localStorage.getItem(STORAGE_PREFIX + rn);
     const data = raw ? JSON.parse(raw) : emptyRnState();
     setActiveRn(rn);
-    localStorage.setItem("pepedot_active_rn", rn);
+    localStorage.setItem("pepedot2_active_rn", rn);
     setPdfs(data.pdfs || []);
     setActivePdfIdx(data.activePdfIdx || 0);
     setCurrentPage(data.currentPage || 1);
@@ -147,15 +141,12 @@ export default function App() {
   const createRn = () => {
     const name = (window.prompt("Unesi naziv novog RN-a (npr. RN001 ili RN1-KAT):") || "").trim();
     if (!name) return;
-    if (rnList.includes(name)) {
-      window.alert("RN s tim nazivom već postoji.");
-      return;
-    }
+    if (rnList.includes(name)) return window.alert("RN s tim nazivom već postoji.");
     const updated = [...rnList, name];
     setRnList(updated);
-    localStorage.setItem("pepedot_rn_list", JSON.stringify(updated));
+    localStorage.setItem("pepedot2_rn_list", JSON.stringify(updated));
     setActiveRn(name);
-    localStorage.setItem("pepedot_active_rn", name);
+    localStorage.setItem("pepedot2_active_rn", name);
     const init = emptyRnState();
     localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(init));
     setPdfs(init.pdfs);
@@ -171,10 +162,7 @@ export default function App() {
     if (!activeRn) return;
     const newName = (window.prompt("Novi naziv za RN:", activeRn) || "").trim();
     if (!newName || newName === activeRn) return;
-    if (rnList.includes(newName)) {
-      window.alert("RN s tim nazivom već postoji.");
-      return;
-    }
+    if (rnList.includes(newName)) return window.alert("RN s tim nazivom već postoji.");
     const oldKey = STORAGE_PREFIX + activeRn;
     const data = localStorage.getItem(oldKey);
     if (data) {
@@ -183,19 +171,19 @@ export default function App() {
     }
     const updated = rnList.map((r) => (r === activeRn ? newName : r));
     setRnList(updated);
-    localStorage.setItem("pepedot_rn_list", JSON.stringify(updated));
+    localStorage.setItem("pepedot2_rn_list", JSON.stringify(updated));
     setActiveRn(newName);
-    localStorage.setItem("pepedot_active_rn", newName);
+    localStorage.setItem("pepedot2_active_rn", newName);
   };
 
   const deleteRn = (rn) => {
     localStorage.removeItem(STORAGE_PREFIX + rn);
     const updated = rnList.filter((x) => x !== rn);
     setRnList(updated);
-    localStorage.setItem("pepedot_rn_list", JSON.stringify(updated));
+    localStorage.setItem("pepedot2_rn_list", JSON.stringify(updated));
     if (activeRn === rn) {
       setActiveRn("");
-      localStorage.removeItem("pepedot_active_rn");
+      localStorage.removeItem("pepedot2_active_rn");
       setPdfs([]);
       setActivePdfIdx(0);
       setCurrentPage(1);
@@ -207,14 +195,12 @@ export default function App() {
 
   const deleteRnWithConfirm = (rnName) => {
     const confirmation = window.prompt(`Za brisanje RN-a upišite njegov naziv: "${rnName}"`);
-    if (confirmation !== rnName) {
-      window.alert("Naziv RN-a nije ispravan, brisanje otkazano.");
-      return;
-    }
+    if (confirmation !== rnName) return window.alert("Naziv RN-a nije ispravan, brisanje otkazano.");
     if (!window.confirm(`Jeste li sigurni da želite obrisati RN "${rnName}"?`)) return;
     deleteRn(rnName);
   };
 
+  // ---- PDF: render + load (arrayBuffer → blob URL fallback) ----
   const renderPdfPage = async (pdf, pageNum) => {
     try {
       setPdfLoading(true);
@@ -247,10 +233,10 @@ export default function App() {
     try {
       let pdf;
       try {
-        pdf = await pdfjsLib.getDocument({ data: uint8 }).promise; // pokušaj 1
+        pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
       } catch (e1) {
         const blobUrl = URL.createObjectURL(new Blob([uint8], { type: "application/pdf" }));
-        pdf = await pdfjsLib.getDocument({ url: blobUrl }).promise; // fallback 2
+        pdf = await pdfjsLib.getDocument({ url: blobUrl }).promise;
       }
       setPdfDoc(pdf);
       await renderPdfPage(pdf, pageNum);
@@ -268,21 +254,16 @@ export default function App() {
     setPdfLoading(true);
     setPdfError("");
     try {
-      const buf = await file.arrayBuffer();                // umjesto FileReader
+      const buf = await file.arrayBuffer();
       const uint8 = new Uint8Array(buf);
       let pdf;
       try {
-        pdf = await pdfjsLib.getDocument({ data: uint8 }).promise; // pokušaj 1
+        pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
       } catch (e1) {
         const blobUrl = URL.createObjectURL(new Blob([uint8], { type: "application/pdf" }));
-        pdf = await pdfjsLib.getDocument({ url: blobUrl }).promise; // fallback 2
+        pdf = await pdfjsLib.getDocument({ url: blobUrl }).promise;
       }
-      const item = {
-        id: Date.now(),
-        name: file.name || "tlocrt.pdf",
-        data: Array.from(uint8),
-        numPages: pdf.numPages,
-      };
+      const item = { id: Date.now(), name: file.name || "tlocrt.pdf", data: Array.from(uint8), numPages: pdf.numPages };
       const next = [...pdfs, item];
       setPdfs(next);
       setActivePdfIdx(next.length - 1);
@@ -305,7 +286,7 @@ export default function App() {
     try {
       await addPdf(file);
     } finally {
-      e.target.value = ""; // omogućuje ponovno biranje iste datoteke
+      e.target.value = "";
     }
   };
 
@@ -348,22 +329,12 @@ export default function App() {
     const p = pdfs[idx];
     if (!p) return;
     const confirmation = window.prompt(`Za brisanje PDF-a upišite njegov naziv: "${p.name}"`);
-    if (confirmation !== p.name) {
-      window.alert("Naziv PDF-a nije ispravan, brisanje otkazano.");
-      return;
-    }
+    if (confirmation !== p.name) return window.alert("Naziv PDF-a nije ispravan, brisanje otkazano.");
     if (!window.confirm(`Jeste li sigurni da želite obrisati PDF "${p.name}"? (obrisat će se i točke s njega)`)) return;
     deletePdf(idx);
   };
 
-  const changePage = async (dir) => {
-    if (!pdfDoc || !pdfs.length) return;
-    const total = pdfs[activePdfIdx].numPages || 1;
-    const next = Math.min(Math.max(1, currentPage + dir), total);
-    setCurrentPage(next);
-    await renderPdfPage(pdfDoc, next);
-  };
-
+  // photo helpers
   const toCanvasCoords = () => {
     const st = stageRef.current && stageRef.current.getStage();
     const p = st && st.getPointerPosition();
@@ -391,10 +362,7 @@ export default function App() {
   };
 
   const addPointWithPhoto = async (preferCamera) => {
-    if (!pdfs.length || !pdfDoc) {
-      window.alert("Prvo učitaj PDF u aktivni RN.");
-      return;
-    }
+    if (!pdfs.length || !pdfDoc) return window.alert("Prvo učitaj PDF u aktivni RN.");
     const file = await pickPhoto(preferCamera);
     if (!file) return;
     const base = window.prompt("Unesi naziv točke (npr. A233VIO):");
@@ -442,6 +410,7 @@ export default function App() {
     setPoints(copy);
   };
 
+  // exports
   const exportPDF = async () => {
     const node = exportRef.current;
     if (!node) return;
@@ -462,7 +431,7 @@ export default function App() {
       ID: i + 1,
       NazivTocke: p.name,
       NazivFotografije: p.originalName || "",
-      Datum: p.dateISO || "",
+      Datum: p.dateISO || ""
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -475,23 +444,11 @@ export default function App() {
       <div style={container}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 8,
-                background: deco.gold,
-                display: "grid",
-                placeItems: "center",
-                color: "#1b1b1b",
-                fontWeight: 800,
-                letterSpacing: 1,
-              }}
-            >
+            <div style={{ width: 40, height: 40, borderRadius: 8, background: deco.gold, display: "grid", placeItems: "center", color: "#1b1b1b", fontWeight: 800, letterSpacing: 1 }}>
               P
             </div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 1 }}>PEPEDOT</div>
+              <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 1 }}>PEPEDOT 2</div>
               <div style={{ fontSize: 12, color: "#b7c3c8" }}>PP BRTVLJENJE - FOTOTOČKA NANACRTU</div>
             </div>
           </div>
@@ -510,12 +467,7 @@ export default function App() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
             {rnList.map((rn) => (
               <div key={rn} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button
-                  style={{ ...btn.base, ...(rn === activeRn ? btn.gold : btn.ghost) }}
-                  onClick={() => loadRn(rn)}
-                >
-                  {rn}
-                </button>
+                <button style={{ ...btn.base, ...(rn === activeRn ? btn.gold : btn.ghost) }} onClick={() => loadRn(rn)}>{rn}</button>
                 <button style={{ ...btn.base, ...btn.danger }} onClick={() => deleteRnWithConfirm(rn)}>Obriši</button>
               </div>
             ))}
@@ -546,21 +498,14 @@ export default function App() {
             <button style={{ ...btn.base }} onClick={exportExcel}>Izvoz Excel</button>
             <button style={{ ...btn.base, ...btn.gold }} onClick={exportPDF}>Izvoz PDF</button>
           </div>
-          {pdfLoading && (
-            <div style={{ marginTop: 8, fontSize: 12, color: "#b7c3c8" }}>Učitavam PDF…</div>
-          )}
-          {pdfError && (
-            <div style={{ marginTop: 8, fontSize: 12, color: "#ffb3b3" }}>{pdfError}</div>
-          )}
+
+          {pdfLoading && <div style={{ marginTop: 8, fontSize: 12, color: "#b7c3c8" }}>Učitavam PDF…</div>}
+          {pdfError && <div style={{ marginTop: 8, fontSize: 12, color: "#ffb3b3" }}>{pdfError}</div>}
 
           {!!pdfs.length && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
               {pdfs.map((p, i) => (
-                <button
-                  key={p.id}
-                  style={{ ...btn.base, ...(i === activePdfIdx ? btn.gold : btn.ghost) }}
-                  onClick={() => selectPdf(i)}
-                >
+                <button key={p.id} style={{ ...btn.base, ...(i === activePdfIdx ? btn.gold : btn.ghost) }} onClick={() => selectPdf(i)}>
                   {p.name} ({p.numPages} str.)
                 </button>
               ))}
@@ -581,9 +526,7 @@ export default function App() {
             <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <button style={{ ...btn.base, ...btn.primary }} onClick={() => addPointWithPhoto(true)}>📷 Nova točka (kamera)</button>
               <button style={{ ...btn.base }} onClick={() => addPointWithPhoto(false)}>📁 Nova točka (iz galerije)</button>
-              <div style={{ fontSize: 11, color: "#9fb2b8", alignSelf: "center" }}>
-                Hint: Tapni na tlocrt ili koristi gumb za dodavanje točke s fotografijom.
-              </div>
+              <div style={{ fontSize: 11, color: "#9fb2b8", alignSelf: "center" }}>Hint: Dodaj točku s fotografijom, pa je zalijepi na tlocrt.</div>
               {!!pdfs.length && (
                 <>
                   <button style={{ ...btn.base }} onClick={() => changePage(-1)}>◀</button>
@@ -595,17 +538,8 @@ export default function App() {
               )}
             </div>
 
-            <div
-              style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${deco.edge}` }}
-              onDoubleClick={() => addPointWithPhoto(true)}
-              title="Tapni ili dvoklikni na tlocrt da dodaš točku s fotografijom"
-            >
-              <Stage
-                width={stageSize.width}
-                height={stageSize.height}
-                ref={stageRef}
-                onClick={() => addPointWithPhoto(true)}
-              >
+            <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${deco.edge}` }}>
+              <Stage width={stageSize.width} height={stageSize.height} ref={stageRef}>
                 <Layer>
                   {background && (
                     <KonvaImage
@@ -637,9 +571,7 @@ export default function App() {
         </section>
 
         <section style={{ ...panel, marginTop: 12 }}>
-          <div style={{ fontWeight: 700, letterSpacing: 0.6, marginBottom: 8 }}>
-            Fotografije (lista — klik na ikonu za pregled)
-          </div>
+          <div style={{ fontWeight: 700, letterSpacing: 0.6, marginBottom: 8 }}>Fotografije (lista — klik na ikonu za pregled)</div>
           <div style={{ display: "grid", gap: 8 }}>
             {points
               .filter((p) => p.pdfIdx === activePdfIdx && p.page === currentPage)
@@ -652,9 +584,7 @@ export default function App() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <button style={{ ...btn.base }} onClick={() => setPreviewPhoto(p)} title="Pregled fotografije">🔍</button>
                       <div style={{ fontWeight: 700 }}>{p.name}</div>
-                      <div style={{ fontSize: 12, color: "#9fb2b8" }}>
-                        {p.originalName} · {p.dateISO} · {p.source === "captured" ? "kamera" : "galerija"}
-                      </div>
+                      <div style={{ fontSize: 12, color: "#9fb2b8" }}>{p.originalName} · {p.dateISO} · {p.source === "captured" ? "kamera" : "galerija"}</div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <a href={p.image} download={downloadName} style={{ ...btn.base, ...btn.ghost, textDecoration: "none" }} title="Preuzmi fotografiju">⬇️</a>
@@ -668,19 +598,7 @@ export default function App() {
         </section>
 
         {previewPhoto && (
-          <div
-            onClick={() => setPreviewPhoto(null)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.7)",
-              display: "grid",
-              placeItems: "center",
-              zIndex: 9999,
-              padding: 16,
-            }}
-            title="Zatvori"
-          >
+          <div onClick={() => setPreviewPhoto(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "grid", placeItems: "center", zIndex: 9999, padding: 16 }} title="Zatvori">
             <div style={{ maxWidth: "95vw", maxHeight: "90vh", background: "#0f2328", border: `1px solid ${deco.edge}`, borderRadius: 12, padding: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ fontWeight: 700 }}>{previewPhoto.name}</div>
@@ -692,7 +610,7 @@ export default function App() {
         )}
 
         <footer style={{ textAlign: "center", fontSize: 12, color: "#8ea3a9", padding: 16 }}>
-          © {new Date().getFullYear()} PEPEDOT · PP BRTVLJENJE - FOTOTOČKA NANACRTU
+          © {new Date().getFullYear()} PEPEDOT 2 · PP BRTVLJENJE - FOTOTOČKA NANACRTU
         </footer>
       </div>
     </div>
