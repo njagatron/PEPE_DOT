@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Stage, Layer, Image as KonvaImage, Circle, Text } from "react-konva";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -29,7 +29,7 @@ export default function App() {
 
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const sessionId = React.useMemo(() => Date.now(), []);
+  const sessionId = useMemo(() => Date.now(), []);
 
   const stageRef = useRef(null);
   const exportRef = useRef(null);
@@ -138,7 +138,7 @@ export default function App() {
       setPdfDoc(null);
       setBackground(null);
     }
-    setShowAllSessions(false); // nakon load-a RN, po defaultu prikaz samo nove sesije
+    setShowAllSessions(false);
   };
 
   const createRn = () => {
@@ -216,17 +216,17 @@ export default function App() {
     const page = await pdf.getPage(pageNum);
     const viewport = page.getViewport({ scale: 2 });
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     await page.render({ canvasContext: ctx, viewport }).promise;
-    const img = new window.Image();
-    img.src = canvas.toDataURL();
+    const img = new Image();
+    img.src = canvas.toDataURL("image/png");
     img.onload = () => setBackground(img);
   };
 
   const loadPdfFromData = async (uint8, pageNum = 1) => {
-    const pdf = await pdfjsLib.getDocument(uint8).promise;
+    const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
     setPdfDoc(pdf);
     await renderPdfPage(pdf, pageNum);
   };
@@ -235,10 +235,10 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = async () => {
       const uint8 = new Uint8Array(reader.result);
-      const pdf = await pdfjsLib.getDocument(uint8).promise;
+      const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
       const item = {
         id: Date.now(),
-        name: file.name,
+        name: file.name || "tlocrt.pdf",
         data: Array.from(uint8),
         numPages: pdf.numPages,
       };
@@ -254,7 +254,7 @@ export default function App() {
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return; // ne provjeravamo strogo MIME; radi i na iOS
+    if (!file) return;
     await addPdf(file);
     e.target.value = "";
   };
@@ -476,7 +476,7 @@ export default function App() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <input
               type="file"
-              accept="application/pdf"
+              accept=".pdf,application/pdf"
               onChange={handlePdfUpload}
               style={{ padding: 6, background: "#0f2328", border: `1px solid ${deco.edge}`, borderRadius: 10, color: deco.ink }}
             />
