@@ -102,8 +102,8 @@ export default function App() {
   }, [background, stageSize]);
 
   useEffect(() => {
-    if (activeRn) saveRn(activeRn);
-  }, [points, pdfFileName, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (activeRn) saveRn(activeRn);
+}, [points, pdfFileName, currentPage]);
 
   const fitBackground = (img, w, h) => {
     if (!img) return { w, h, x: 0, y: 0, scaleX: 1, scaleY: 1 };
