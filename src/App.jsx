@@ -244,31 +244,64 @@ export default function App() {
     }
   };
 
-  const loadPdfFromData = async (uint8, pageNum = 1) => {
+const loadPdfFromData = async (uint8, pageNum = 1) => {
+  try {
+    setPdfLoading(true);
+    setPdfError("");
+    const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+    setPdfDoc(pdf);
+    await renderPdfPage(pdf, pageNum);
+  } catch (err) {
+    console.error("PDF load error (data):", err);
+    // Fallback: pokušaj Blob URL
     try {
-      setPdfLoading(true);
-      setPdfError("");
-      const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+      const blob = new Blob([uint8], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(blob);
+      const pdf = await pdfjsLib.getDocument({ url: blobUrl }).promise;
       setPdfDoc(pdf);
       await renderPdfPage(pdf, pageNum);
-    } catch (err) {
-      console.error("PDF load error:", err);
+      // Napomena: URL.revokeObjectURL(blobUrl) ne radimo odmah jer PDFJS može još referencirati url tijekom navigacije stranicama
+    } catch (err2) {
+      console.error("PDF load error (blob url):", err2);
       setPdfError("Ne mogu učitati PDF datoteku.");
       setPdfDoc(null);
       setBackground(null);
-    } finally {
-      setPdfLoading(false);
     }
-  };
+  } finally {
+    setPdfLoading(false);
+  }
+};
 
-  const addPdf = async (file) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
+const addPdf = async (file) => {
+  const reader = new FileReader();
+  reader.onload = async () => {
+    setPdfLoading(true);
+    setPdfError("");
+    try {
+      const uint8 = new Uint8Array(reader.result);
+      // Pokušaj 1: data
+      let pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+      const item = {
+        id: Date.now(),
+        name: file.name || "tlocrt.pdf",
+        data: Array.from(uint8),
+        numPages: pdf.numPages,
+      };
+      const next = [...pdfs, item];
+      setPdfs(next);
+      setActivePdfIdx(next.length - 1);
+      setCurrentPage(1);
+      setPdfDoc(pdf);
+      await renderPdfPage(pdf, 1);
+    } catch (err) {
+      console.warn("PDF add error (data) – pokušavam blob URL:", err);
       try {
-        setPdfLoading(true);
-        setPdfError("");
+        // Pokušaj 2: blob url
         const uint8 = new Uint8Array(reader.result);
-        const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+        const blob = new Blob([uint8], { type: "application/pdf" });
+        const blobUrl = URL.createObjectURL(blob);
+        const pdf = await pdfjsLib.getDocument({ url: blobUrl }).promise;
+
         const item = {
           id: Date.now(),
           name: file.name || "tlocrt.pdf",
@@ -281,18 +314,21 @@ export default function App() {
         setCurrentPage(1);
         setPdfDoc(pdf);
         await renderPdfPage(pdf, 1);
-      } catch (err) {
-        console.error("PDF add error:", err);
-        setPdfError("Ne mogu učitati ovaj PDF. Provjeri datoteku.");
-      } finally {
-        setPdfLoading(false);
+        // URL.revokeObjectURL(blobUrl) preskačemo ovdje (vidi napomenu u loadPdfFromData)
+      } catch (err2) {
+        console.error("PDF add error (blob url):", err2);
+        setPdfError("Ne mogu učitati ovaj PDF. Probaj drugi dokument ili manju datoteku.");
       }
-    };
-    reader.onerror = () => {
-      setPdfError("Greška pri čitanju PDF datoteke.");
-    };
-    reader.readAsArrayBuffer(file);
+    } finally {
+      setPdfLoading(false);
+    }
   };
+  reader.onerror = () => {
+    setPdfError("Greška pri čitanju PDF datoteke.");
+    setPdfLoading(false);
+  };
+  reader.readAsArrayBuffer(file);
+};
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files?.[0];
