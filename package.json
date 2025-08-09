@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1"
+"pdfjs-dist": "3.11.174",
+"konva": "^9.3.0",
+"react-konva": "^18.2.8",
+"html2canvas": "^1.4.1",
+"jspdf": "^2.5.1",
+"xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "react-scripts start",
